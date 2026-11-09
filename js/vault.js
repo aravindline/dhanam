@@ -51,6 +51,16 @@ export async function unlock(secret) {
 
 export function lock() { key = null; cache = null; }
 
+// Microsoft sign-in leaves the page and comes back, which would normally ask for the PIN again. Just before
+// leaving, the (non-extractable) key is parked in this phone's app storage for a few minutes and picked up on return.
+export async function stashKey() { if (key) await meta.set('resume', { key, at: Date.now() }); }
+export async function resumeStashed(maxMs) {
+  const r = await meta.get('resume'); await meta.del('resume');
+  if (!r || !r.key || Date.now() - r.at > maxMs || Date.now() < r.at) return false;
+  try { const c = await decryptJSON(r.key, await meta.get('check'), 'check'); if (c.v !== CHECK) return false; } catch (e) { return false; }
+  key = r.key; await loadCache(); return true;
+}
+
 // Fingerprint unlock: the PIN-derived key bytes, checked against the stored check value.
 export async function rawKeyFor(secret) {
   const salt = unb64(await meta.get('salt')); const raw = await deriveRaw(secret, salt, await meta.get('iter'));

@@ -6,7 +6,7 @@ import { h, btn, toast, dialog, confirm, alertBox, pinPad } from './ui.js';
 import { MODES, ICONS } from './cats.js';
 import { monthBars, monthLine, catBars, legend, monthTable } from './charts.js';
 import { voiceSupported, listen, parseSpeech } from './voice.js';
-import { S, go, back, tab, render, setPref, doSync, linkFile, linked, syncState, lockNow, VERSION, scheduleSync } from './app.js';
+import { S, go, back, tab, render, setPref, doSync, linkFile, linked, syncState, lockNow, VERSION, scheduleSync, FONTS, LOCKS } from './app.js';
 import * as auth from './auth.js';
 import * as vault from './vault.js';
 import * as bio from './bio.js';
@@ -67,8 +67,13 @@ function home() {
   const now = new Date(), y = now.getFullYear(), m = now.getMonth();
   const tt = totals(inMonth(y, m));
   const recent = activeEntries().filter(e => e.type !== 'loan').sort((a, b) => (b.date + b.createdAt).localeCompare(a.date + a.createdAt)).slice(0, 5);
+  const todayList = activeEntries().filter(e => e.date === todayISO());
+  const nudge = todayList.length
+    ? h('div', { class: 'today-card done' }, '✅ ' + t('todayDone') + ': ' + todayList.length)
+    : h('div', { class: 'today-card' }, h('strong', null, '📝 ' + t('todayNone')), h('span', { class: 'small' }, t('todayHint')));
   return page(t('home'), [
     ...banners(),
+    nudge,
     h('section', { class: 'card' },
       h('h2', { class: 'card-title' }, t('thisMonth') + ' · ' + monthYear(y, m)),
       h('div', { class: 'tiles' }, tile('income', tt.income), tile('expense', tt.expense), tile('invest', tt.invest), tile('savings', tt.savings)),
@@ -225,6 +230,8 @@ function charts(p) {
 
 // ---------- Settings
 function settings() {
+  const curFont = Math.max(0, FONTS.indexOf(parseFloat(document.documentElement.style.fontSize)));
+  const curLock = S.lockMs || 60000;
   const acct = auth.currentAccount();
   const fs = D.set; const st = syncState();
   const linkIn = h('input', { type: 'url', class: 'txt', placeholder: 'https://1drv.ms/x/…', 'aria-label': t('fileLink') });
@@ -242,11 +249,15 @@ function settings() {
     h('section', { class: 'card' }, h('h2', { class: 'card-title' }, t('language')),
       h('div', { class: 'seg' }, btn('தமிழ்', () => setPref('lang', 'ta'), 'seg-btn' + (lang() === 'ta' ? ' on' : '')), btn('English', () => setPref('lang', 'en'), 'seg-btn' + (lang() === 'en' ? ' on' : '')))),
     h('section', { class: 'card' }, h('h2', { class: 'card-title' }, t('fontSize')),
-      h('div', { class: 'seg' }, [t('fsNormal'), t('fsLarge'), t('fsXL')].map((l, i) => btn([h('span', { class: 'fs-a', style: 'font-size:' + [1, 1.2, 1.4][i] + 'rem' }, 'அ'), ' ' + l], () => setPref('font', i), 'seg-btn fs' + (Math.round(parseFloat(document.documentElement.style.fontSize)) === Math.round([17, 19.5, 22][i]) ? ' on' : ''))))),
+      h('div', { class: 'fs-row' },
+        btn('அ −', () => setPref('font', Math.max(0, curFont - 1)), 'btn fs-btn fs-minus', { 'aria-label': t('smaller'), disabled: curFont <= 0 }),
+        h('div', { class: 'fs-level' }, h('strong', null, (curFont + 1) + ' / ' + FONTS.length), h('div', { class: 'fs-dots' }, FONTS.map((_, i) => h('span', { class: 'fs-dot' + (i <= curFont ? ' on' : '') })))),
+        btn('அ +', () => setPref('font', Math.min(FONTS.length - 1, curFont + 1)), 'btn fs-btn fs-plus', { 'aria-label': t('bigger'), disabled: curFont >= FONTS.length - 1 })),
+      h('p', { class: 'muted small' }, t('fsHint'))),
     h('section', { class: 'card' }, h('h2', { class: 'card-title' }, t('categories')), btn('🗂 ' + t('manageCats') + ' ›', () => go('cats', { type: 'expense' }), 'btn wide')),
     h('section', { class: 'card' }, h('h2', { class: 'card-title' }, '☁️ ' + t('sync')),
       !auth.configured() ? h('p', { class: 'muted' }, 'Sign-in not set up') :
-        acct ? h('div', { class: 'set-row' }, h('span', null, t('signedInAs') + ': ' + (acct.username || acct.name)), btn(t('signOut'), async () => { if (await confirm(t('signOut') + '?')) auth.signOut(); }, 'btn small ghost'))
+        acct ? h('div', { class: 'set-row' }, h('span', null, t('signedInAs') + ': ' + (acct.username || acct.name)), btn(t('signOut'), () => askPin(async () => { if (await confirm(t('signOutWarn'), t('signOut'), true)) auth.signOut(); }), 'btn small ghost'))
           : btn('🔑 ' + t('signIn'), () => auth.signIn(), 'btn primary wide'),
       acct && linked() ? [h('div', { class: 'set-row' }, h('span', null, t('linked') + ': ' + (fs.fileName || '')), h('span', { class: 'pill ' + st.cls }, st.icon + ' ' + st.text)),
         h('p', { class: 'muted small' }, t('lastSync') + ': ' + (fs.lastSync ? stampShort(fs.lastSync) : t('never')) + (D.ops.length ? ' · ' + D.ops.length + ' ' + t('pending') : '')),
@@ -254,7 +265,8 @@ function settings() {
         h('details', null, h('summary', null, t('changeFile')), h('div', { class: 'link-box' }, linkIn, btn(t('linkFile'), doLink, 'btn')))] : null,
       acct && !linked() ? [h('p', { class: 'muted small' }, t('linkOffer')), h('div', { class: 'link-box' }, h('span', { class: 'fld-lbl' }, t('fileLink')), linkIn, btn(t('linkFile'), doLink, 'btn primary'))] : null,
       S.needsSignIn ? btn('🔑 ' + t('signIn'), () => auth.signIn(), 'btn primary wide') : null),
-    h('section', { class: 'card' }, h('h2', { class: 'card-title' }, '🔒 ' + t('lock')), h('p', { class: 'muted small' }, t('autoLock')), fpSec,
+    h('section', { class: 'card' }, h('h2', { class: 'card-title' }, '🔒 ' + t('lock')), h('span', { class: 'fld-lbl' }, t('autoLockQ')),
+      h('div', { class: 'chips' }, LOCKS.map(ms => btn(ms < 60000 ? ms / 1000 + ' ' + t('sec') : ms / 60000 + ' ' + t('min'), async () => { await meta.set('lockMs', ms); S.lockMs = ms; await setPref('lockMs', ms); }, 'chip' + (curLock === ms ? ' on' : '')))), fpSec,
       h('div', { class: 'btn-row' }, btn(t('changePin'), changePin, 'btn'), btn(t('lockNow'), lockNow, 'btn'))),
     h('section', { class: 'card' }, h('h2', { class: 'card-title' }, '⏰ ' + t('reminder')), h('p', { class: 'muted small' }, t('reminderNote'))),
     h('section', { class: 'card' }, h('h2', { class: 'card-title' }, t('about')), h('p', { class: 'muted small' }, 'தனம் · ' + t('version') + ' ' + VERSION),

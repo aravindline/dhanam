@@ -62,10 +62,10 @@ button { cursor: pointer; }
 .card-title { margin: 0 0 .6rem; font-size: 1.08rem; }
 .card-head { display: flex; justify-content: space-between; align-items: center; }
 .card-head .card-title { margin: 0; }
-.tiles { display: grid; grid-template-columns: 1fr 1fr; gap: .6rem; }
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 9.2rem), 1fr)); gap: .6rem; }
 .tile { border-radius: 12px; padding: .65rem .75rem; min-width: 0; }
 .tile-lbl { font-size: .92rem; font-weight: 600; }
-.tile-val { font-size: 1.3rem; font-weight: 700; overflow-wrap: anywhere; }
+.tile-val { font-size: 1.3rem; font-weight: 700; white-space: nowrap; }
 .t-income { background: var(--inc-soft); } .t-income .tile-lbl { color: #1d5ba6; }
 .t-expense { background: var(--exp-soft); } .t-expense .tile-lbl { color: #9a3d13; }
 .t-invest { background: var(--inv-soft); } .t-invest .tile-lbl { color: #0d6648; }
@@ -74,7 +74,7 @@ button { cursor: pointer; }
 .banner.err { background: var(--bad-soft); border-color: #e9b4ae; }
 
 /* home add buttons */
-.add-row { display: grid; grid-template-columns: 1fr 1fr; gap: .7rem; }
+.add-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 8.5rem), 1fr)); gap: .7rem; }
 .add-exp, .add-inc { min-height: 4rem; font-size: 1.25rem; color: #fff; border: 0; }
 .add-exp { background: var(--exp); } .add-inc { background: var(--inc); }
 .add-inv { background: var(--inv-soft); border-color: #a9d8c5; color: #0d6648; }
@@ -103,8 +103,8 @@ button { cursor: pointer; }
 .chip.on { background: var(--brand-soft); border-color: var(--brand); color: var(--brand); }
 .chip.on::before { content: '✓ '; white-space: pre; }
 .date-chip input { position: absolute; inset: 0; opacity: 0; width: 100%; height: 100%; cursor: pointer; }
-.seg { display: flex; gap: .4rem; background: #ece6da; padding: .3rem; border-radius: var(--r); }
-.seg-btn { flex: 1 1 0; min-width: 0; overflow-wrap: anywhere; line-height: 1.2; border: 0; border-radius: 11px; min-height: 3rem; background: transparent; font-weight: 700; font-size: 1rem; padding: .3rem .4rem; }
+.seg { display: flex; flex-wrap: wrap; gap: .4rem; background: #ece6da; padding: .3rem; border-radius: var(--r); }
+.seg-btn { flex: 1 1 auto; min-width: 0; overflow-wrap: normal; line-height: 1.2; border: 0; border-radius: 11px; min-height: 3rem; background: transparent; font-weight: 700; font-size: 1rem; padding: .3rem .4rem; }
 .seg-btn.on { background: var(--card); box-shadow: 0 1px 3px rgba(0,0,0,.18); color: var(--brand); }
 .seg-btn.s-expense.on { color: #9a3d13; } .seg-btn.s-income.on { color: #1d5ba6; } .seg-btn.s-invest.on { color: #0d6648; }
 .seg.four .seg-btn { font-size: .9rem; }
@@ -202,3 +202,12 @@ details { overflow-x: auto; }
 .toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: 5.6rem; z-index: 30; background: #262420; color: #fff; padding: .7rem 1rem; border-radius: 14px; display: flex; gap: 1rem; align-items: center; font-weight: 600; max-width: calc(100% - 2rem); box-shadow: 0 4px 14px rgba(0,0,0,.25); }
 .toast-btn { background: #fff; color: #262420; border: 0; border-radius: 10px; padding: .45rem .8rem; font-weight: 700; min-height: 2.6rem; }
 .setup h1 { margin: 0; font-size: 1.5rem; }
+.today-card { display: flex; flex-direction: column; gap: .2rem; background: var(--warn-soft); border: 2px solid #e5c76b; border-radius: var(--r); padding: .75rem .9rem; font-size: 1.05rem; }
+.today-card.done { background: #dff2e3; border-color: #a8d8b5; font-weight: 600; }
+.fs-row { display: flex; align-items: center; gap: .6rem; }
+.fs-btn { flex: none; min-width: 3.6rem; padding: .4rem .6rem; min-height: 3.4rem; font-size: 1.25rem; font-weight: 700; }
+.fs-plus { font-size: 1.45rem; }
+.fs-level { flex: 1; min-width: 0; text-align: center; display: flex; flex-direction: column; align-items: center; gap: .3rem; }
+.fs-dots { display: flex; gap: 3px; flex-wrap: wrap; justify-content: center; }
+.fs-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--line); }
+.fs-dot.on { background: var(--brand); }

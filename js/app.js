@@ -11,14 +11,19 @@ import { t, setLang, lang, errText } from './i18n.js';
 import { h, btn, pinPad, confirm, toast } from './ui.js';
 import { renderView } from './views.js';
 
-export const VERSION = '1.0.0';
+export const VERSION = '1.1.0';
 export const S = { view: 'home', params: {}, stack: [], syncing: false, syncErr: null, needsSignIn: false, conflicts: [] };
-const FONTS = [17, 19.5, 22];
+export const FONTS = [15, 16, 17, 18.5, 20, 21.5, 23, 25, 27]; // text size steps (− / +); 17 = normal
+export const LOCKS = [30000, 60000, 120000, 300000, 600000];
 const root = () => document.getElementById('app');
+let lockMs = 60000;
 
 export async function applyPrefs() {
   setLang((await meta.get('lang')) || 'ta');
-  document.documentElement.style.fontSize = FONTS[(await meta.get('font')) ?? 0] + 'px';
+  if (!(await meta.get('fontV2'))) { const old = await meta.get('font'); await meta.set('font', old === undefined ? 2 : [2, 4, 6][old] ?? 2); await meta.set('fontV2', true); }
+  const f = Math.min(FONTS.length - 1, Math.max(0, (await meta.get('font')) ?? 2));
+  document.documentElement.style.fontSize = FONTS[f] + 'px';
+  lockMs = (await meta.get('lockMs')) || CONFIG.lockAfterMs; S.lockMs = lockMs;
 }
 export async function setPref(k, v) { await meta.set(k, v); await applyPrefs(); render(); }
 
@@ -63,6 +68,7 @@ async function setupFlow() {
 
 let lockTimer = null;
 async function lockScreen() {
+  await meta.del('resume');
   const r = root(); vault.lock(); D.entries = []; D.ops = []; D.cats = []; D.set = {}; S.view = 'home'; S.stack = []; document.querySelector('.modal-wrap')?.remove(); r.innerHTML = '';
   const wait = await vault.waitRemaining();
   const hasFp = await bio.enrolled();
@@ -93,7 +99,7 @@ async function started() {
 let hiddenAt = 0;
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'hidden') hiddenAt = Date.now();
-  else if (vault.isUnlocked() && hiddenAt && Date.now() - hiddenAt > CONFIG.lockAfterMs) lockScreen();
+  else if (vault.isUnlocked() && hiddenAt && Date.now() - hiddenAt > lockMs) lockScreen();
   else if (vault.isUnlocked()) scheduleSync(1000);
 });
 
@@ -148,8 +154,9 @@ window.addEventListener('online', () => scheduleSync(1000));
 // ---------- start
 (async function boot() {
   await applyPrefs();
+  auth.setBeforeRedirect(() => vault.stashKey());
   try { await auth.init(); } catch (e) { console.warn('sign-in init', e); }
   if ('serviceWorker' in navigator && !['localhost', '127.0.0.1'].includes(location.hostname)) navigator.serviceWorker.register('sw.js').catch(() => {});
-  if (await vault.isSetUp()) lockScreen(); else setupFlow();
+  if (await vault.isSetUp()) { if (await vault.resumeStashed(5 * 60000)) started(); else lockScreen(); } else setupFlow();
 })();
 export { records };

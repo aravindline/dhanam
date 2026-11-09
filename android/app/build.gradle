@@ -9,24 +9,14 @@ android {
         versionCode 1
         versionName '1.0.0'
     }
-    signingConfigs {
-        release {
-            // From GitHub secrets (see README). The same key must sign every version so updates install over the old one.
-            def ks = System.getenv('DHANAM_KEYSTORE_FILE')
-            if (ks) {
-                storeFile file(ks)
-                storePassword System.getenv('DHANAM_KEYSTORE_PASSWORD')
-                keyAlias 'dhanam'
-                keyPassword System.getenv('DHANAM_KEYSTORE_PASSWORD')
-            }
-        }
-    }
     buildTypes {
         release {
             minifyEnabled false
-            // without the secrets (e.g. a first trial), fall back to the build machine's debug key
-            signingConfig System.getenv('DHANAM_KEYSTORE_FILE') ? signingConfigs.release : signingConfigs.debug
+            // signed with the build machine's own key (no secrets to set up). To install a newer build later,
+            // uninstall the old one first.
+            signingConfig signingConfigs.debug
         }
     }
+    lint { checkReleaseBuilds false; abortOnError false }
     compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
 }

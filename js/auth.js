@@ -3,6 +3,8 @@
 // or stores your Microsoft password.
 import { CONFIG } from './config.js';
 let pca = null, account = null;
+let beforeRedirect = async () => {};
+export function setBeforeRedirect(fn) { beforeRedirect = fn; }
 
 function testMode() { return !!CONFIG.testToken; }
 
@@ -20,7 +22,12 @@ export const configured = () => testMode() || !!CONFIG.clientId;
 export const currentAccount = () => account;
 export async function signIn() {
   if (testMode()) return account;
-  await pca.loginRedirect({ scopes: CONFIG.scopes, prompt: 'select_account' });
+  // Signing in again: go straight to the same account (no account picker). If Microsoft still remembers
+  // the phone ("Stay signed in"), it comes straight back without asking for the password.
+  const known = account || (pca.getAllAccounts()[0]) || null;
+  await beforeRedirect();
+  if (known) await pca.loginRedirect({ scopes: CONFIG.scopes, loginHint: known.username });
+  else await pca.loginRedirect({ scopes: CONFIG.scopes, prompt: 'select_account' });
 }
 export async function signOut() { if (testMode()) { account = null; return; } if (pca && account) await pca.logoutRedirect({ account }); }
 // Background syncs never leave the app to sign in (leaving the page locks the app). They set needsSignIn instead,
@@ -34,6 +41,6 @@ export async function getToken(interactive = false) {
   catch (e) {
     needs = true;
     if (!interactive) throw Object.assign(new Error('Microsoft sign-in expired.'), { code: 'signin' });
-    await pca.acquireTokenRedirect({ scopes: CONFIG.scopes, account }); throw Object.assign(new Error('Signing in again…'), { code: 'signing' });
+    await beforeRedirect(); await pca.acquireTokenRedirect({ scopes: CONFIG.scopes, account }); throw Object.assign(new Error('Signing in again…'), { code: 'signing' });
   }
 }
