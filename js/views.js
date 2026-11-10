@@ -23,7 +23,7 @@ function topbar(title, opts = {}) {
   return h('header', { class: 'topbar' },
     opts.back ? btn('←', back, 'icon-btn', { 'aria-label': t('back') }) : h('span', { class: 'brand' }, 'தனம்'),
     h('h1', null, title),
-    h('button', { type: 'button', class: 'sync-badge ' + s.cls, 'aria-label': s.text, title: s.text, onclick: () => { if (linked()) { doSync(true); toast(s.text); } else tab('settings'); } }, s.icon),
+    h('button', { type: 'button', class: 'sync-badge ' + s.cls, 'aria-label': s.text, title: s.text, onclick: () => { if (!auth.currentAccount() || S.needsSignIn || !linked()) tab('settings'); else { doSync(); toast(s.text); } } }, s.icon),
     btn(lang() === 'ta' ? 'English' : 'தமிழ்', () => setPref('lang', lang() === 'ta' ? 'en' : 'ta'), 'lang-btn', { 'aria-label': 'Language' }));
 }
 function nav(active) {
@@ -31,6 +31,9 @@ function nav(active) {
   return h('nav', { class: 'bottom-nav' }, items.map(([v, i, l]) => h('button', { type: 'button', class: 'nav-item' + (v === active ? ' on' : ''), onclick: () => tab(v), 'aria-current': v === active ? 'page' : null }, h('span', { class: 'nav-ic' }, i), h('span', null, l))));
 }
 const page = (title, body, active, opts) => h('div', { class: 'page' + (active ? ' with-nav' : '') }, topbar(title, opts), h('main', { class: 'content' }, body), active ? nav(active) : null);
+
+// Field heading: a soft tinted strip with an icon, so each part of the form is easy to find.
+const lbl = (icon, text, optional) => h('span', { class: 'fld-lbl' }, h('span', { class: 'fld-ic', 'aria-hidden': 'true' }, icon), h('span', null, text), optional ? h('span', { class: 'opt' }, t('optional')) : null);
 
 // ---------- sums
 const ym = d => d.slice(0, 7);
@@ -51,8 +54,9 @@ function entryRow(e) {
 }
 function banners() {
   const out = [];
-  if (!linked()) out.push(h('button', { type: 'button', class: 'banner warn', onclick: () => tab('settings') }, '☁️ ' + t('notLinked') + ' ›'));
-  else if (S.needsSignIn) out.push(h('button', { type: 'button', class: 'banner warn', onclick: () => auth.signIn() }, '🔑 ' + t('err_signin')));
+  // Sign-in has its own highlighted banner; tapping it opens the Microsoft account card in Settings.
+  if (auth.configured() && (!auth.currentAccount() || S.needsSignIn)) out.push(h('button', { type: 'button', class: 'banner ms', onclick: () => tab('settings') }, h('span', { class: 'ms-ic' }, '🔑'), h('span', null, h('strong', null, auth.currentAccount() ? t('msNeeds') : t('signInBanner')), ' ›')));
+  else if (!linked()) out.push(h('button', { type: 'button', class: 'banner warn', onclick: () => tab('settings') }, '☁️ ' + t('notLinked') + ' ›'));
   if (S.conflicts.length) out.push(h('button', { type: 'button', class: 'banner err', onclick: showConflicts }, '⚠️ ' + t('conflictsTitle') + ' (' + S.conflicts.length + ')'));
   return out;
 }
@@ -100,23 +104,23 @@ function form(p) {
     if (f.type !== 'loan') body.appendChild(h('div', { class: 'seg', role: 'tablist' }, ['expense', 'income', 'invest'].map(ty => btn(t(ty), () => { if (f.type === ty) return; f.type = ty; f.cat = ''; f.sub = ''; const tc = topCats(ty); if (tc.length === 1) f.cat = tc[0].id; draw(); }, 'seg-btn s-' + ty + (f.type === ty ? ' on' : ''), { role: 'tab', 'aria-selected': f.type === ty ? 'true' : 'false' }))));
     if (voiceSupported()) body.appendChild(h('div', { class: 'voice' }, btn(t('speak'), speak, 'btn voice-btn'), heard ? h('p', { class: 'heard' }, t('youSaid') + ': "' + heard + '" · ' + t('voiceCheck')) : h('p', { class: 'muted small' }, t('voiceHint'))));
     const amt = h('input', { class: 'amount', type: 'text', inputmode: 'decimal', autocomplete: 'off', 'aria-label': t('amount'), placeholder: '0', value: f.amount === '' ? '' : String(f.amount), oninput: e => { const v = e.target.value.replace(/[^\d.]/g, ''); e.target.value = v; f.amount = v; } });
-    body.appendChild(h('label', { class: 'fld' }, h('span', { class: 'fld-lbl' }, t('amount') + ' (₹)'), h('div', { class: 'amount-wrap' }, h('span', { class: 'rupee' }, '₹'), amt)));
+    body.appendChild(h('label', { class: 'fld' }, lbl('💰', t('amount') + ' (₹)'), h('div', { class: 'amount-wrap' }, h('span', { class: 'rupee' }, '₹'), amt)));
     const tops = topCats(f.type).concat(old && f.cat && !topCats(f.type).some(c => c.id === f.cat) && catById(f.cat) ? [catById(f.cat)] : []);
     if (tops.length > 1 || !f.cat) {
-      body.appendChild(h('div', { class: 'fld' }, h('span', { class: 'fld-lbl' }, t('category')), h('div', { class: 'cat-grid' }, tops.map(c => btn([h('span', { class: 'cat-ic' }, c.icon || '•'), h('span', { class: 'cat-nm' }, label(c))], () => { f.cat = c.id; f.sub = ''; draw(); }, 'cat-tile' + (f.cat === c.id ? ' on' : ''), { 'aria-pressed': f.cat === c.id ? 'true' : 'false' })))));
+      body.appendChild(h('div', { class: 'fld' }, lbl('🗂', t('category')), h('div', { class: 'cat-grid' }, tops.map(c => btn([h('span', { class: 'cat-ic' }, c.icon || '•'), h('span', { class: 'cat-nm' }, label(c))], () => { f.cat = c.id; f.sub = ''; draw(); }, 'cat-tile' + (f.cat === c.id ? ' on' : ''), { 'aria-pressed': f.cat === c.id ? 'true' : 'false' })))));
     }
     if (f.cat) {
       const subs = subCats(f.cat).concat(old && f.sub && !subCats(f.cat).some(s => s.id === f.sub) && catById(f.sub) ? [catById(f.sub)] : []);
-      if (subs.length) body.appendChild(h('div', { class: 'fld' }, h('span', { class: 'fld-lbl' }, (tops.length > 1 ? t('sub') + ' ' + t('optional') : label(catById(f.cat)) + ' — ' + t('sub'))), h('div', { class: 'chips' }, subs.map(s => btn(label(s), () => { f.sub = f.sub === s.id ? '' : s.id; draw(); }, 'chip' + (f.sub === s.id ? ' on' : ''), { 'aria-pressed': f.sub === s.id ? 'true' : 'false' })))));
+      if (subs.length) body.appendChild(h('div', { class: 'fld' }, lbl('🏷', tops.length > 1 ? t('sub') : label(catById(f.cat)) + ' — ' + t('sub'), tops.length > 1), h('div', { class: 'chips' }, subs.map(s => btn(label(s), () => { f.sub = f.sub === s.id ? '' : s.id; draw(); }, 'chip' + (f.sub === s.id ? ' on' : ''), { 'aria-pressed': f.sub === s.id ? 'true' : 'false' })))));
     }
     const yest = isoDate(new Date(Date.now() - 86400000));
     const dateIn = h('input', { type: 'date', class: 'date-in', value: f.date, max: todayISO(), 'aria-label': t('pickDate'), onchange: e => { if (e.target.value) { f.date = e.target.value; draw(); } } });
-    body.appendChild(h('div', { class: 'fld' }, h('span', { class: 'fld-lbl' }, t('date') + ': ' + dateLong(f.date)), h('div', { class: 'chips' },
+    body.appendChild(h('div', { class: 'fld' }, lbl('📅', t('date') + ': ' + dateLong(f.date)), h('div', { class: 'chips' },
       btn(t('today'), () => { f.date = todayISO(); draw(); }, 'chip' + (f.date === todayISO() ? ' on' : '')),
       btn(t('yesterday'), () => { f.date = yest; draw(); }, 'chip' + (f.date === yest ? ' on' : '')),
       h('label', { class: 'chip date-chip' + (f.date !== todayISO() && f.date !== yest ? ' on' : '') }, '📅 ' + t('pickDate'), dateIn))));
-    body.appendChild(h('div', { class: 'fld' }, h('span', { class: 'fld-lbl' }, (f.type === 'income' ? t('modeIn') : t('mode')) + ' ' + t('optional')), h('div', { class: 'chips' }, MODES.map(m => btn(m.icon + ' ' + label(m), () => { f.mode = f.mode === m.id ? '' : m.id; draw(); }, 'chip' + (f.mode === m.id ? ' on' : ''), { 'aria-pressed': f.mode === m.id ? 'true' : 'false' })))));
-    body.appendChild(h('label', { class: 'fld' }, h('span', { class: 'fld-lbl' }, t('notes') + ' ' + t('optional')), h('input', { type: 'text', class: 'txt', value: f.notes || '', placeholder: t('notesPh'), maxlength: 200, oninput: e => { f.notes = e.target.value; } })));
+    body.appendChild(h('div', { class: 'fld' }, lbl('💳', f.type === 'income' ? t('modeIn') : t('mode'), true), h('div', { class: 'chips' }, MODES.map(m => btn(m.icon + ' ' + label(m), () => { f.mode = f.mode === m.id ? '' : m.id; draw(); }, 'chip' + (f.mode === m.id ? ' on' : ''), { 'aria-pressed': f.mode === m.id ? 'true' : 'false' })))));
+    body.appendChild(h('label', { class: 'fld' }, lbl('📝', t('notes'), true), h('input', { type: 'text', class: 'txt', value: f.notes || '', placeholder: t('notesPh'), maxlength: 200, oninput: e => { f.notes = e.target.value; } })));
     body.appendChild(err);
     body.appendChild(h('div', { class: 'form-actions' }, old ? btn('🗑 ' + t('delete'), del, 'btn danger-ghost') : null, btn('✓ ' + t('save'), saveIt, 'btn primary big save-btn')));
   };
@@ -246,6 +250,7 @@ function settings() {
     else fpSec.append(btn(t('fpTurnOn'), () => askPin(async p => { await bio.enroll(await vault.rawKeyFor(p), 'Amma'); toast(t('fpDone')); render(); }), 'btn small'));
   })();
   return page(t('settings'), [
+    msCard(acct),
     h('section', { class: 'card' }, h('h2', { class: 'card-title' }, t('language')),
       h('div', { class: 'seg' }, btn('தமிழ்', () => setPref('lang', 'ta'), 'seg-btn' + (lang() === 'ta' ? ' on' : '')), btn('English', () => setPref('lang', 'en'), 'seg-btn' + (lang() === 'en' ? ' on' : '')))),
     h('section', { class: 'card' }, h('h2', { class: 'card-title' }, t('fontSize')),
@@ -256,16 +261,13 @@ function settings() {
       h('p', { class: 'muted small' }, t('fsHint'))),
     h('section', { class: 'card' }, h('h2', { class: 'card-title' }, t('categories')), btn('🗂 ' + t('manageCats') + ' ›', () => go('cats', { type: 'expense' }), 'btn wide')),
     h('section', { class: 'card' }, h('h2', { class: 'card-title' }, '☁️ ' + t('sync')),
-      !auth.configured() ? h('p', { class: 'muted' }, 'Sign-in not set up') :
-        acct ? h('div', { class: 'set-row' }, h('span', null, t('signedInAs') + ': ' + (acct.username || acct.name)), btn(t('signOut'), () => askPin(async () => { if (await confirm(t('signOutWarn'), t('signOut'), true)) auth.signOut(); }), 'btn small ghost'))
-          : btn('🔑 ' + t('signIn'), () => auth.signIn(), 'btn primary wide'),
+      !acct ? h('p', { class: 'muted' }, t('signInFirst')) : null,
       acct && linked() ? [h('div', { class: 'set-row' }, h('span', null, t('linked') + ': ' + (fs.fileName || '')), h('span', { class: 'pill ' + st.cls }, st.icon + ' ' + st.text)),
         h('p', { class: 'muted small' }, t('lastSync') + ': ' + (fs.lastSync ? stampShort(fs.lastSync) : t('never')) + (D.ops.length ? ' · ' + D.ops.length + ' ' + t('pending') : '')),
-        btn('⟳ ' + t('syncNow'), async () => { await doSync(true); }, 'btn wide'),
+        btn('⟳ ' + t('syncNow'), async () => { await doSync(); }, 'btn wide', { disabled: S.needsSignIn }),
         h('details', null, h('summary', null, t('changeFile')), h('div', { class: 'link-box' }, linkIn, btn(t('linkFile'), doLink, 'btn')))] : null,
-      acct && !linked() ? [h('p', { class: 'muted small' }, t('linkOffer')), h('div', { class: 'link-box' }, h('span', { class: 'fld-lbl' }, t('fileLink')), linkIn, btn(t('linkFile'), doLink, 'btn primary'))] : null,
-      S.needsSignIn ? btn('🔑 ' + t('signIn'), () => auth.signIn(), 'btn primary wide') : null),
-    h('section', { class: 'card' }, h('h2', { class: 'card-title' }, '🔒 ' + t('lock')), h('span', { class: 'fld-lbl' }, t('autoLockQ')),
+      acct && !linked() ? [h('p', { class: 'muted small' }, t('linkOffer')), h('div', { class: 'link-box' }, lbl('🔗', t('fileLink')), linkIn, btn(t('linkFile'), doLink, 'btn primary'))] : null),
+    h('section', { class: 'card' }, h('h2', { class: 'card-title' }, '🔒 ' + t('lock')), lbl('⏱', t('autoLockQ')),
       h('div', { class: 'chips' }, LOCKS.map(ms => btn(ms < 60000 ? ms / 1000 + ' ' + t('sec') : ms / 60000 + ' ' + t('min'), async () => { await meta.set('lockMs', ms); S.lockMs = ms; await setPref('lockMs', ms); }, 'chip' + (curLock === ms ? ' on' : '')))), fpSec,
       h('div', { class: 'btn-row' }, btn(t('changePin'), changePin, 'btn'), btn(t('lockNow'), lockNow, 'btn'))),
     h('section', { class: 'card' }, h('h2', { class: 'card-title' }, '⏰ ' + t('reminder')), h('p', { class: 'muted small' }, t('reminderNote'))),
@@ -273,11 +275,22 @@ function settings() {
       btn(t('resetPhone'), async () => { if (await confirm(t('resetConfirm'), t('delete'), true)) { await vault.resetDevice(); location.reload(); } }, 'btn danger-ghost small')),
   ], 'settings');
 }
+// Microsoft (Outlook) sign-in: its own highlighted card at the top of Settings, apart from the Excel file steps.
+function msCard(acct) {
+  if (!auth.configured()) return h('section', { class: 'card' }, h('p', { class: 'muted' }, 'Sign-in not set up'));
+  const need = !acct || S.needsSignIn;
+  return h('section', { class: 'card ms-card' + (need ? ' need' : '') },
+    h('h2', { class: 'card-title' }, '🔑 ' + t('msAcct')),
+    acct ? h('div', { class: 'set-row' }, h('span', { class: 'ms-who' }, h('strong', null, (S.needsSignIn ? '⚠️ ' + t('msNeeds') : '✓ ' + t('msOk'))), h('span', { class: 'small' }, acct.username || acct.name)),
+      S.needsSignIn ? null : btn(t('signOut'), () => askPin(async () => { if (await confirm(t('signOutWarn'), t('signOut'), true)) auth.signOut(); }), 'btn small ghost')) : h('p', { class: 'small' }, t('msAcctNote')),
+    need ? btn('🔑 ' + t('signIn'), () => auth.signIn(), 'btn primary big wide ms-btn') : null);
+}
 function askPin(then) {
   return new Promise(res => {
     const wrap = h('div', { class: 'modal-wrap' });
     const pad = pinPad(t('enterPin'), async p => { try { await vault.rawKeyFor(p); } catch (e) { pad.clear(); pad.setMsg(t('wrongPin'), true); return; } wrap.remove(); try { await then(p); } catch (e) { alertBox(e.message); } res(true); });
     wrap.appendChild(h('div', { class: 'modal' }, pad.el, btn(t('cancel'), () => { wrap.remove(); res(false); }, 'btn ghost wide')));
+    wrap._close = () => { wrap.remove(); res(false); };
     document.body.appendChild(wrap);
   });
 }
@@ -327,7 +340,7 @@ async function nameDialog(title, c, withIcon) {
   const grid = withIcon ? h('div', { class: 'icon-grid' }) : null;
   const drawIcons = () => { grid.innerHTML = ''; ICONS.forEach(i => grid.appendChild(btn(i, () => { icon = i; drawIcons(); }, 'icon-pick' + (icon === i ? ' on' : '')))); };
   if (grid) drawIcons();
-  const body = h('div', { class: 'form' }, h('label', { class: 'fld' }, h('span', { class: 'fld-lbl' }, t('nameTa')), ta), h('label', { class: 'fld' }, h('span', { class: 'fld-lbl' }, t('nameEn') + ' ' + t('optional')), en), grid ? h('div', { class: 'fld' }, h('span', { class: 'fld-lbl' }, t('icon')), grid) : null, err);
+  const body = h('div', { class: 'form' }, h('label', { class: 'fld' }, lbl('அ', t('nameTa')), ta), h('label', { class: 'fld' }, lbl('A', t('nameEn'), true), en), grid ? h('div', { class: 'fld' }, lbl('🖼', t('icon')), grid) : null, err);
   for (;;) {
     const v = await dialog(title, body, [{ label: t('cancel'), cls: 'btn ghost', value: false }, { label: t('save'), cls: 'btn primary', value: true }]);
     if (!v) return null;

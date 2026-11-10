@@ -55,7 +55,9 @@ export function lock() { key = null; cache = null; }
 // leaving, the (non-extractable) key is parked in this phone's app storage for a few minutes and picked up on return.
 export async function stashKey() { if (key) await meta.set('resume', { key, at: Date.now() }); }
 export async function resumeStashed(maxMs) {
-  const r = await meta.get('resume'); await meta.del('resume');
+  const r = await meta.get('resume');
+  // kept for 10 s, so a second page load straight after the Microsoft page still opens without the PIN
+  setTimeout(() => meta.del('resume'), 10000);
   if (!r || !r.key || Date.now() - r.at > maxMs || Date.now() < r.at) return false;
   try { const c = await decryptJSON(r.key, await meta.get('check'), 'check'); if (c.v !== CHECK) return false; } catch (e) { return false; }
   key = r.key; await loadCache(); return true;

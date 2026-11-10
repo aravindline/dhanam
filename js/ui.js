@@ -32,6 +32,7 @@ export function dialog(title, body, buttons) {
         title ? h('h2', null, title) : null,
         typeof body === 'string' ? h('p', null, body) : body,
         h('div', { class: 'modal-btns' }, buttons.map(b => btn(b.label, () => close(b.value), b.cls || 'btn')))));
+    wrap._close = () => close(null); // phone Back button
     document.body.appendChild(wrap);
     wrap.querySelector('.modal-btns button:last-child')?.focus();
   });

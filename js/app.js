@@ -11,7 +11,7 @@ import { t, setLang, lang, errText } from './i18n.js';
 import { h, btn, pinPad, confirm, toast } from './ui.js';
 import { renderView } from './views.js';
 
-export const VERSION = '1.1.0';
+export const VERSION = '1.2.0';
 export const S = { view: 'home', params: {}, stack: [], syncing: false, syncErr: null, needsSignIn: false, conflicts: [] };
 export const FONTS = [15, 16, 17, 18.5, 20, 21.5, 23, 25, 27]; // text size steps (− / +); 17 = normal
 export const LOCKS = [30000, 60000, 120000, 300000, 600000];
@@ -37,9 +37,25 @@ export function tab(view) { document.querySelector('.toast')?.remove(); S.stack 
 
 export function render() {
   if (!vault.isUnlocked()) return;
+  armBack();
   const r = root(); r.innerHTML = '';
   r.appendChild(renderView(S.view, S.params));
 }
+
+// ---------- phone Back button: moves back inside the app instead of closing it.
+// One extra history step is kept armed. Back closes an open box, then goes to the previous screen, then Home.
+// On Home, the first Back only shows "press Back again to close"; the next Back closes the app.
+let armed = false;
+function armBack() { if (!armed) { try { history.pushState({ dh: 1 }, ''); armed = true; } catch (e) {} } }
+window.addEventListener('popstate', () => {
+  armed = false;
+  if (!vault.isUnlocked()) return;
+  const w = [...document.querySelectorAll('.modal-wrap')].pop();
+  if (w) { if (w._close) w._close(); else w.remove(); armBack(); return; }
+  if (S.stack.length) return back();
+  if (S.view !== 'home') return tab('home');
+  toast(t('backExit'), null, 2500);
+});
 
 // ---------- first run and lock
 async function setupFlow() {
@@ -105,16 +121,17 @@ document.addEventListener('visibilitychange', () => {
 
 // ---------- sync
 let syncTimer = null;
-export function scheduleSync(ms = 2500) { clearTimeout(syncTimer); syncTimer = setTimeout(() => doSync(false), ms); }
+export function scheduleSync(ms = 2500) { clearTimeout(syncTimer); syncTimer = setTimeout(() => doSync(), ms); }
 export const linked = () => !!(D.set.driveId && D.set.itemId);
-export function transport(interactive) { return new GraphFile({ base: CONFIG.graphBase, getToken: () => auth.getToken(interactive), driveId: D.set.driveId, itemId: D.set.itemId }); }
+export function transport() { return new GraphFile({ base: CONFIG.graphBase, getToken: () => auth.getToken(), driveId: D.set.driveId, itemId: D.set.itemId }); }
 export async function linkFile(link) {
-  const f = await GraphFile.fromShareLink({ base: CONFIG.graphBase, getToken: () => auth.getToken(true), link });
+  const f = await GraphFile.fromShareLink({ base: CONFIG.graphBase, getToken: () => auth.getToken(), link });
   Object.assign(D.set, { driveId: f.driveId, itemId: f.itemId, fileName: f.name, etag: null, lastSync: null }); await saveSet();
   // the phone's own entries are replaced by the file's (anything not yet sent is sent first)
-  await doSync(true, true);
+  await doSync(true);
 }
-export async function doSync(interactive = false, throwErr = false) {
+// Sync never leaves the app (no Microsoft page), so it can never lock the app.
+export async function doSync(throwErr = false) {
   if (!vault.isUnlocked() || !auth.configured() || !auth.currentAccount() || !linked()) return;
   if (S.syncing) { scheduleSync(3000); return; }
   if (!navigator.onLine) { S.syncErr = { code: 'net' }; refreshBadge(); return; }
@@ -122,7 +139,7 @@ export async function doSync(interactive = false, throwErr = false) {
   const ops = D.ops.slice(); ops.forEach(o => inFlight.add(o.opId));
   try {
     const acct = auth.currentAccount();
-    const res = await syncOnce({ transport: transport(interactive), ops, who: acct.name || acct.username, localCats: D.cats, lastEtag: D.set.etag });
+    const res = await syncOnce({ transport: transport(), ops, who: acct.name || acct.username, localCats: D.cats, lastEtag: D.set.etag });
     if (!res.unchanged) {
       const sent = new Set([...res.applied, ...res.conflicts.map(c => c.op.opId)]);
       await takeRemote(res, sent);
@@ -148,7 +165,7 @@ export function syncState() {
   return { cls: 'ok', text: t('syncedOk'), icon: '✓' };
 }
 export function refreshBadge() { const b = document.querySelector('.sync-badge'); if (!b) return; const s = syncState(); b.className = 'sync-badge ' + s.cls; b.textContent = s.icon; b.setAttribute('aria-label', s.text); b.title = s.text; }
-setInterval(() => { if (document.visibilityState === 'visible' && vault.isUnlocked()) doSync(false); }, CONFIG.autoSyncMinutes * 60000);
+setInterval(() => { if (document.visibilityState === 'visible' && vault.isUnlocked()) doSync(); }, CONFIG.autoSyncMinutes * 60000);
 window.addEventListener('online', () => scheduleSync(1000));
 
 // ---------- start

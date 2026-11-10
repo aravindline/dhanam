@@ -12,7 +12,7 @@ export async function init() {
   if (testMode()) { account = { username: CONFIG.testUser || 'test@example.com', name: CONFIG.testName || 'Test' }; return account; }
   if (!CONFIG.clientId) return null;
   if (!window.msal) throw new Error('Sign-in library missing.');
-  pca = new window.msal.PublicClientApplication({ auth: { clientId: CONFIG.clientId, authority: CONFIG.authority, redirectUri: location.origin + location.pathname }, cache: { cacheLocation: 'localStorage' } });
+  pca = new window.msal.PublicClientApplication({ auth: { clientId: CONFIG.clientId, authority: CONFIG.authority, redirectUri: location.origin + location.pathname, navigateToLoginRequestUrl: false }, cache: { cacheLocation: 'localStorage' } });
   await pca.initialize();
   const r = await pca.handleRedirectPromise();
   account = (r && r.account) || pca.getAllAccounts()[0] || null;
@@ -30,17 +30,14 @@ export async function signIn() {
   else await pca.loginRedirect({ scopes: CONFIG.scopes, prompt: 'select_account' });
 }
 export async function signOut() { if (testMode()) { account = null; return; } if (pca && account) await pca.logoutRedirect({ account }); }
-// Background syncs never leave the app to sign in (leaving the page locks the app). They set needsSignIn instead,
-// and only a sync you start yourself goes to the Microsoft sign-in page (you unlock again when you come back).
+// Syncing NEVER leaves the app to sign in (leaving the page is what locked the app). If Microsoft needs a fresh
+// sign-in, sync stops, needsSignIn turns on and the app shows the highlighted "Sign in" card. Only that button
+// goes to the Microsoft page.
 let needs = false;
 export const needsSignIn = () => needs;
-export async function getToken(interactive = false) {
-  if (testMode()) { if (CONFIG.testExpired && !interactive) { needs = true; throw Object.assign(new Error('Microsoft sign-in expired.'), { code: 'signin' }); } needs = false; return CONFIG.testToken; }
+export async function getToken() {
+  if (testMode()) { if (CONFIG.testExpired) { needs = true; throw Object.assign(new Error('Microsoft sign-in expired.'), { code: 'signin' }); } needs = false; return CONFIG.testToken; }
   if (!account) throw Object.assign(new Error('Not signed in to Microsoft.'), { code: 'nosignin' });
   try { const t = (await pca.acquireTokenSilent({ scopes: CONFIG.scopes, account })).accessToken; needs = false; return t; }
-  catch (e) {
-    needs = true;
-    if (!interactive) throw Object.assign(new Error('Microsoft sign-in expired.'), { code: 'signin' });
-    await beforeRedirect(); await pca.acquireTokenRedirect({ scopes: CONFIG.scopes, account }); throw Object.assign(new Error('Signing in again…'), { code: 'signing' });
-  }
+  catch (e) { needs = true; throw Object.assign(new Error('Microsoft sign-in expired.'), { code: 'signin' }); }
 }

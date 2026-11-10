@@ -7,6 +7,8 @@
   --brand: #7a3e12; --brand-ink: #ffffff; --brand-soft: #f6e7d8;
   --inc: #2a78d6; --inc-soft: #e3eefb; --exp: #c4521f; --exp-soft: #fbe6dc; --inv: #12805a; --inv-soft: #dff2ea; --sav: #5b4bc4; --sav-soft: #ebe8fa;
   --bad: #b3261e; --bad-soft: #fde7e5; --warn-soft: #fff3cd; --ok: #1b7a3a;
+  --head-ink: #6b3a14; --head-bg: #f3ebdf; --head-bar: #d9b48f; --head-line: #eadfcd;
+  --ms-ink: #1d4f8f; --ms-soft: #eaf1fb; --ms-line: #a9c4ea;
   --r: 14px; --tap: 3.1rem;
   color-scheme: light;
 }
@@ -59,9 +61,9 @@ button { cursor: pointer; }
 
 /* cards and tiles */
 .card { background: var(--card); border-radius: var(--r); padding: .9rem 1rem; border: 1px solid var(--line); }
-.card-title { margin: 0 0 .6rem; font-size: 1.08rem; }
-.card-head { display: flex; justify-content: space-between; align-items: center; }
-.card-head .card-title { margin: 0; }
+.card-title { margin: 0 0 .7rem; font-size: 1.08rem; color: var(--head-ink); padding-bottom: .45rem; border-bottom: 1px solid var(--head-line); }
+.card-head { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--head-line); margin-bottom: .4rem; }
+.card-head .card-title { margin: 0; padding-bottom: 0; border-bottom: 0; }
 .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 9.2rem), 1fr)); gap: .6rem; }
 .tile { border-radius: 12px; padding: .65rem .75rem; min-width: 0; }
 .tile-lbl { font-size: .92rem; font-weight: 600; }
@@ -72,6 +74,16 @@ button { cursor: pointer; }
 .t-savings { background: var(--sav-soft); } .t-savings .tile-lbl { color: #47399f; }
 .banner { width: 100%; text-align: left; border: 2px solid #e5c76b; background: var(--warn-soft); border-radius: var(--r); padding: .7rem .9rem; font-weight: 600; min-height: var(--tap); }
 .banner.err { background: var(--bad-soft); border-color: #e9b4ae; }
+/* Microsoft (Outlook) sign-in: soft blue, kept apart from the Excel file steps */
+.banner.ms { display: flex; align-items: center; gap: .6rem; background: var(--ms-soft); border-color: var(--ms-line); color: var(--ms-ink); font-size: 1.05rem; }
+.ms-ic { font-size: 1.4rem; }
+.ms-card { background: #f6f9fe; border: 2px solid var(--ms-line); }
+.ms-card.need { background: var(--ms-soft); box-shadow: 0 2px 8px rgba(29,79,143,.12); }
+.ms-card .card-title { color: var(--ms-ink); border-bottom-color: #d3e1f4; }
+.ms-card p { margin: 0 0 .3rem; }
+.ms-who { display: flex; flex-direction: column; gap: .1rem; min-width: 0; overflow-wrap: anywhere; }
+.ms-who strong { color: var(--ms-ink); }
+.ms-btn.btn.primary { background: #2f6db5; border-color: #2f6db5; max-width: none; margin-top: .4rem; }
 
 /* home add buttons */
 .add-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 8.5rem), 1fr)); gap: .7rem; }
@@ -90,9 +102,9 @@ button { cursor: pointer; }
 .row-sub { color: var(--muted); font-size: .86rem; overflow-wrap: anywhere; }
 .row-amt { font-weight: 700; white-space: nowrap; font-size: 1.05rem; }
 .a-income { color: #1d5ba6; } .a-expense { color: #9a3d13; } .a-invest { color: #0d6648; } .a-loan { color: var(--ink2); }
-.day { margin: .8rem 0 .1rem; font-size: .92rem; color: var(--ink2); }
+.day { margin: .75rem 0 .2rem; font-size: .95rem; font-weight: 700; color: var(--head-ink); background: var(--head-bg); padding: .3rem .65rem; border-radius: 8px; }
 .content > .rows { background: var(--card); border: 1px solid var(--line); border-radius: var(--r); padding: 0 .6rem; }
-.content > .rows .day { padding-top: .2rem; }
+.content > .rows { padding-bottom: .3rem; }
 .sum-line { margin: 0; font-weight: 600; color: var(--ink2); }
 .month-nav { display: flex; align-items: center; justify-content: space-between; gap: .5rem; }
 .month-nav strong { font-size: 1.15rem; text-align: center; }
@@ -110,9 +122,12 @@ button { cursor: pointer; }
 .seg.four .seg-btn { font-size: .9rem; }
 
 /* form */
-.form { display: flex; flex-direction: column; gap: 1rem; }
-.fld { display: flex; flex-direction: column; gap: .4rem; }
-.fld-lbl { font-weight: 700; color: var(--ink2); }
+.form { display: flex; flex-direction: column; gap: 1.2rem; }
+.fld { display: flex; flex-direction: column; gap: .5rem; }
+/* field headings: soft warm strip + icon, so Amount / Category / Sub-category / Date stand apart */
+.fld-lbl { display: block; font-weight: 700; color: var(--head-ink); background: var(--head-bg); border-left: 4px solid var(--head-bar); border-radius: 10px; padding: .38rem .7rem; }
+.fld-ic { font-size: 1.05rem; line-height: 1; margin-right: .45rem; }
+.opt { margin-left: .4rem; font-weight: 500; font-size: .85rem; color: var(--muted); }
 .amount-wrap { display: flex; align-items: center; border: 2px solid var(--line); border-radius: var(--r); background: var(--card); padding: 0 .8rem; }
 .amount-wrap:focus-within { border-color: var(--brand); }
 .rupee { font-size: 1.8rem; font-weight: 700; color: var(--ink2); }
@@ -188,6 +203,7 @@ details summary { cursor: pointer; font-weight: 600; color: var(--brand); paddin
 .sub-break { background: #faf7f1; border-radius: 10px; padding: .3rem .8rem; margin-bottom: .3rem; font-size: .92rem; }
 .sel-big { width: 100%; min-height: var(--tap); border: 2px solid var(--line); border-radius: var(--r); padding: .4rem .7rem; background: var(--card); font-weight: 600; }
 .tbl { width: 100%; border-collapse: collapse; font-size: .86rem; }
+.tbl th { background: var(--head-bg); color: var(--head-ink); }
 .tbl th, .tbl td { padding: .35rem .3rem; border-bottom: 1px solid var(--line); text-align: right; white-space: nowrap; }
 .tbl th:first-child, .tbl td:first-child { text-align: left; }
 .tbl .sum td { font-weight: 700; }
@@ -196,7 +212,7 @@ details { overflow-x: auto; }
 /* modal and toast */
 .modal-wrap { position: fixed; inset: 0; background: rgba(20,16,10,.5); z-index: 20; display: flex; align-items: flex-end; justify-content: center; padding: 1rem; }
 .modal { background: var(--card); border-radius: 18px; padding: 1.1rem; width: 100%; max-width: 30rem; max-height: 90vh; overflow-y: auto; display: flex; flex-direction: column; gap: .8rem; }
-.modal h2 { margin: 0; font-size: 1.2rem; }
+.modal h2 { margin: 0; font-size: 1.2rem; color: var(--head-ink); }
 .modal p { margin: 0; white-space: pre-line; font-size: 1.05rem; }
 .modal-btns { display: flex; gap: .6rem; } .modal-btns .btn { flex: 1; }
 .toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: 5.6rem; z-index: 30; background: #262420; color: #fff; padding: .7rem 1rem; border-radius: 14px; display: flex; gap: 1rem; align-items: center; font-weight: 600; max-width: calc(100% - 2rem); box-shadow: 0 4px 14px rgba(0,0,0,.25); }
